@@ -58,6 +58,36 @@ export class HUD {
     }
 
     /**
+     * Draw the combo counter and multiplier
+     * @param {CanvasRenderingContext2D} ctx - The canvas context
+     * @param {number} combo - The current combo count
+     * @param {number} multiplier - The current score multiplier
+     * @param {number} x - X position
+     * @param {number} y - Y position
+     */
+    drawCombo(ctx, combo, multiplier, x, y) {
+        ctx.save();
+        ctx.font = this.hudFont;
+
+        // Only show combo if it's greater than 0
+        if (combo > 0) {
+            // Highlight the multiplier with brighter color when active
+            if (multiplier > 1) {
+                ctx.fillStyle = '#FFFF00'; // Yellow for active multiplier
+                ctx.shadowColor = '#FFFF00';
+            } else {
+                ctx.fillStyle = this.color;
+                ctx.shadowColor = this.color;
+            }
+
+            ctx.shadowBlur = this.glowBlur;
+            ctx.fillText(`COMBO: ${combo} (${multiplier}x)`, x, y);
+        }
+
+        ctx.restore();
+    }
+
+    /**
      * Draw game state messages (START, GAME_OVER, WIN) centered on screen
      * @param {CanvasRenderingContext2D} ctx - The canvas context
      * @param {number} canvasWidth - Width of the canvas
