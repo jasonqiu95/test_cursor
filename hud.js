@@ -1,4 +1,4 @@
-class HUD {
+export class HUD {
     constructor() {
         this.hudFont = '20px Courier New';
         this.stateFont = '48px Courier New';
