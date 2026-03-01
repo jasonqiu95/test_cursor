@@ -134,12 +134,23 @@ export class Alien {
  * AlienGrid class managing a 2D grid of aliens
  */
 export class AlienGrid {
-  constructor(startX = 50, startY = 50) {
+  constructor(startX = 50, startY = 50, difficultyMultiplier = 1) {
     this.startX = startX;
     this.startY = startY;
     this.aliens = [];
     this.direction = 1; // 1 for right, -1 for left
-    this.speed = 20;
+    this.difficultyMultiplier = difficultyMultiplier;
+
+    // Base values - modified by difficulty
+    this.baseSpeed = 20;
+    this.baseShootCooldown = 1000;
+    this.baseShootChance = 0.3;
+
+    // Apply difficulty scaling
+    this.speed = this.baseSpeed * (1 + (difficultyMultiplier - 1) * 0.3); // 30% speed increase per wave
+    this.shootCooldown = Math.max(300, this.baseShootCooldown / difficultyMultiplier); // Faster shooting, min 300ms
+    this.shootChance = Math.min(0.8, this.baseShootChance + (difficultyMultiplier - 1) * 0.1); // More frequent shooting, max 80%
+
     this.descentAmount = 10;
     this.rows = 5;
     this.columns = 11;
@@ -149,8 +160,6 @@ export class AlienGrid {
     this.animationFrame = 0;
     this.animationInterval = 500; // milliseconds between animation frames
     this.shootTimer = 0;
-    this.shootCooldown = 1000; // milliseconds between shots
-    this.shootChance = 0.3; // 30% chance to shoot
 
     this.initializeGrid();
   }
@@ -329,6 +338,20 @@ export class AlienGrid {
   }
 
   /**
+   * Reset the grid with new difficulty
+   */
+  resetWithDifficulty(difficultyMultiplier) {
+    this.difficultyMultiplier = difficultyMultiplier;
+
+    // Recalculate difficulty-based parameters
+    this.speed = this.baseSpeed * (1 + (difficultyMultiplier - 1) * 0.3);
+    this.shootCooldown = Math.max(300, this.baseShootCooldown / difficultyMultiplier);
+    this.shootChance = Math.min(0.8, this.baseShootChance + (difficultyMultiplier - 1) * 0.1);
+
+    this.reset();
+  }
+
+  /**
    * Get count of remaining aliens
    */
   getRemainingCount() {
@@ -364,8 +387,8 @@ export class AlienGrid {
   }
 
   /**
-   * Attempt to shoot from a random bottom alien
-   * Returns the position for bullet creation or null
+   * Attempt to shoot from random bottom aliens
+   * Returns an array of positions for bullet creation or null
    */
   shoot(deltaTime) {
     this.shootTimer += deltaTime;
@@ -388,16 +411,27 @@ export class AlienGrid {
       return null;
     }
 
-    // Randomly select one bottom alien to shoot
-    const shootingAlien = bottomAliens[Math.floor(Math.random() * bottomAliens.length)];
+    // Calculate number of aliens that should shoot based on difficulty
+    // Wave 1: 1 alien, Wave 2: 1-2 aliens, Wave 3+: 1-3 aliens
+    const maxShooters = Math.min(3, Math.floor(this.difficultyMultiplier / 2) + 1);
+    const numShooters = Math.min(maxShooters, bottomAliens.length);
+
+    // Randomly select aliens to shoot
+    const shootingPositions = [];
+    const shuffled = [...bottomAliens].sort(() => Math.random() - 0.5);
+
+    for (let i = 0; i < numShooters; i++) {
+      const shootingAlien = shuffled[i];
+      shootingPositions.push({
+        x: shootingAlien.x + shootingAlien.width / 2,
+        y: shootingAlien.y + shootingAlien.height
+      });
+    }
 
     // Reset timer
     this.shootTimer = 0;
 
-    // Return the position for bullet creation
-    return {
-      x: shootingAlien.x + shootingAlien.width / 2,
-      y: shootingAlien.y + shootingAlien.height
-    };
+    // Return array of positions for bullet creation
+    return shootingPositions;
   }
 }

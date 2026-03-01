@@ -518,6 +518,7 @@ class GameState {
     this.lives = 3;
     this.score = 0;
     this.combo = 0;
+    this.wave = 1;
     this.eventListeners = {};
 
     // Valid state transitions
@@ -603,6 +604,25 @@ class GameState {
   }
 
   /**
+   * Get current wave
+   */
+  getWave() {
+    return this.wave;
+  }
+
+  /**
+   * Increment wave number
+   */
+  nextWave() {
+    this.wave++;
+    this.emit('waveChange', {
+      previous: this.wave - 1,
+      current: this.wave
+    });
+    return this.wave;
+  }
+
+  /**
    * Set game state with validation and event notification
    */
   setState(newState) {
@@ -673,12 +693,14 @@ class GameState {
     this.lives = 3;
     this.score = 0;
     this.combo = 0;
+    this.wave = 1;
 
     this.emit('reset', {
       previousState,
       lives: this.lives,
       score: this.score,
-      combo: this.combo
+      combo: this.combo,
+      wave: this.wave
     });
   }
 
@@ -851,7 +873,8 @@ class GameState {
     return {
       state: this.state,
       lives: this.lives,
-      score: this.score
+      score: this.score,
+      wave: this.wave
     };
   }
 }
@@ -981,7 +1004,7 @@ function init() {
 
     // Initialize game objects
     player = new Player(canvas.width, canvas.height);
-    alienGrid = new AlienGrid(50, 50);
+    alienGrid = new AlienGrid(50, 50, 1); // Start with difficulty multiplier of 1
     bulletManager = new BulletManager();
     hud = new HUD();
     inputHandler = new InputHandler();
@@ -1162,9 +1185,9 @@ function update(deltaTime) {
         // Check collisions between downward bullets and player
         checkPlayerBulletCollisions();
 
-        // Check if all aliens are destroyed (win condition)
+        // Check if all aliens are destroyed (wave complete)
         if (alienGrid.allDestroyed()) {
-            gameState.winGame();
+            handleWaveComplete();
         }
 
         // Check if aliens reached the player (lose condition)
@@ -1287,12 +1310,36 @@ function checkPlayerBulletCollisions() {
 }
 
 /**
+ * Handle wave completion - spawn next wave with increased difficulty
+ */
+function handleWaveComplete() {
+    // Increment wave counter
+    gameState.nextWave();
+
+    // Clear all bullets
+    bulletManager.bullets = [];
+
+    // Reset shoot cooldown
+    shootCooldown = 0;
+
+    // Respawn aliens with increased difficulty
+    const currentWave = gameState.getWave();
+    alienGrid.resetWithDifficulty(currentWave);
+
+    // Play victory sound for wave completion
+    soundManager.playVictory();
+
+    // Brief pause before continuing (optional - game continues immediately)
+    console.log(`Wave ${currentWave} started! Difficulty increased.`);
+}
+
+/**
  * Reset the game to initial state
  */
 function resetGame() {
     // Reset game objects
     player = new Player(canvas.width, canvas.height);
-    alienGrid.reset();
+    alienGrid.resetWithDifficulty(1); // Start at wave 1 difficulty
     bulletManager.bullets = [];
     particleManager.clear();
     shieldManager.reset();
@@ -1339,6 +1386,7 @@ function render() {
         hud.drawScore(ctx, gameState.getScore(), 20, 30);
         hud.drawLives(ctx, gameState.getLives(), canvas.width - 120, 30);
         hud.drawCombo(ctx, gameState.getCombo(), gameState.getMultiplier(), 20, 60);
+        hud.drawWave(ctx, gameState.getWave(), canvas.width / 2 - 50, 30);
 
         // Draw pause overlay if paused
         if (isPaused) {

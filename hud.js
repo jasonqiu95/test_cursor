@@ -88,6 +88,23 @@ export class HUD {
     }
 
     /**
+     * Draw the current wave number
+     * @param {CanvasRenderingContext2D} ctx - The canvas context
+     * @param {number} wave - The current wave number
+     * @param {number} x - X position
+     * @param {number} y - Y position
+     */
+    drawWave(ctx, wave, x, y) {
+        ctx.save();
+        ctx.font = this.hudFont;
+        ctx.fillStyle = this.color;
+        ctx.shadowColor = this.color;
+        ctx.shadowBlur = this.glowBlur;
+        ctx.fillText(`WAVE: ${wave}`, x, y);
+        ctx.restore();
+    }
+
+    /**
      * Draw game state messages (START, GAME_OVER, WIN) centered on screen
      * @param {CanvasRenderingContext2D} ctx - The canvas context
      * @param {number} canvasWidth - Width of the canvas
