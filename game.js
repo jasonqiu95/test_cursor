@@ -5,6 +5,259 @@ import { BulletManager } from './bullet.js';
 import { HUD } from './hud.js';
 import { InputHandler } from './input.js';
 
+/**
+ * Sound Manager class for retro arcade sound effects using Web Audio API
+ */
+class SoundManager {
+  constructor() {
+    this.audioContext = null;
+    this.enabled = true;
+    this.alienMoveInterval = null;
+    this.alienMoveSpeed = 1000; // milliseconds between beeps
+    this.minAlienMoveSpeed = 200; // fastest speed
+
+    // Initialize audio context on user interaction
+    this.initAudioContext();
+  }
+
+  /**
+   * Initialize Web Audio API context
+   */
+  initAudioContext() {
+    try {
+      this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    } catch (e) {
+      console.warn('Web Audio API not supported');
+      this.enabled = false;
+    }
+  }
+
+  /**
+   * Resume audio context if it's suspended (browser autoplay policy)
+   */
+  resumeContext() {
+    if (this.audioContext && this.audioContext.state === 'suspended') {
+      this.audioContext.resume();
+    }
+  }
+
+  /**
+   * Create a simple oscillator-based tone
+   * @param {number} frequency - Frequency in Hz
+   * @param {number} duration - Duration in seconds
+   * @param {string} type - Oscillator type (sine, square, sawtooth, triangle)
+   * @param {number} volume - Volume (0-1)
+   */
+  playTone(frequency, duration, type = 'square', volume = 0.3) {
+    if (!this.enabled || !this.audioContext) return;
+
+    this.resumeContext();
+
+    const oscillator = this.audioContext.createOscillator();
+    const gainNode = this.audioContext.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(this.audioContext.destination);
+
+    oscillator.type = type;
+    oscillator.frequency.value = frequency;
+
+    gainNode.gain.value = volume;
+    gainNode.gain.exponentialRampToValueAtTime(
+      0.01,
+      this.audioContext.currentTime + duration
+    );
+
+    oscillator.start(this.audioContext.currentTime);
+    oscillator.stop(this.audioContext.currentTime + duration);
+  }
+
+  /**
+   * Play shoot sound - classic pew pew
+   */
+  playShoot() {
+    if (!this.enabled || !this.audioContext) return;
+
+    this.resumeContext();
+
+    const oscillator = this.audioContext.createOscillator();
+    const gainNode = this.audioContext.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(this.audioContext.destination);
+
+    oscillator.type = 'square';
+    oscillator.frequency.value = 200;
+
+    // Frequency sweep down
+    oscillator.frequency.exponentialRampToValueAtTime(
+      50,
+      this.audioContext.currentTime + 0.1
+    );
+
+    gainNode.gain.value = 0.3;
+    gainNode.gain.exponentialRampToValueAtTime(
+      0.01,
+      this.audioContext.currentTime + 0.1
+    );
+
+    oscillator.start(this.audioContext.currentTime);
+    oscillator.stop(this.audioContext.currentTime + 0.1);
+  }
+
+  /**
+   * Play alien destroyed sound - explosion-like
+   */
+  playAlienDestroyed() {
+    if (!this.enabled || !this.audioContext) return;
+
+    this.resumeContext();
+
+    const oscillator = this.audioContext.createOscillator();
+    const gainNode = this.audioContext.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(this.audioContext.destination);
+
+    oscillator.type = 'sawtooth';
+    oscillator.frequency.value = 100;
+
+    // Frequency sweep down for explosion effect
+    oscillator.frequency.exponentialRampToValueAtTime(
+      30,
+      this.audioContext.currentTime + 0.2
+    );
+
+    gainNode.gain.value = 0.4;
+    gainNode.gain.exponentialRampToValueAtTime(
+      0.01,
+      this.audioContext.currentTime + 0.2
+    );
+
+    oscillator.start(this.audioContext.currentTime);
+    oscillator.stop(this.audioContext.currentTime + 0.2);
+  }
+
+  /**
+   * Play single alien move beep
+   */
+  playAlienMove() {
+    this.playTone(150, 0.1, 'square', 0.2);
+  }
+
+  /**
+   * Start periodic alien movement sound
+   * @param {number} speed - Speed factor (0-1, higher is faster)
+   */
+  startAlienMovement(speed = 0) {
+    this.stopAlienMovement();
+
+    // Calculate interval based on speed (faster as aliens get closer)
+    const speedRange = this.alienMoveSpeed - this.minAlienMoveSpeed;
+    this.currentAlienSpeed = this.alienMoveSpeed - (speedRange * speed);
+
+    this.alienMoveInterval = setInterval(() => {
+      this.playAlienMove();
+    }, this.currentAlienSpeed);
+  }
+
+  /**
+   * Stop alien movement sound
+   */
+  stopAlienMovement() {
+    if (this.alienMoveInterval) {
+      clearInterval(this.alienMoveInterval);
+      this.alienMoveInterval = null;
+    }
+  }
+
+  /**
+   * Update alien movement speed based on game state
+   * @param {number} speed - Speed factor (0-1)
+   */
+  updateAlienMovementSpeed(speed = 0) {
+    if (this.alienMoveInterval) {
+      this.startAlienMovement(speed);
+    }
+  }
+
+  /**
+   * Play player hit sound
+   */
+  playPlayerHit() {
+    if (!this.enabled || !this.audioContext) return;
+
+    this.resumeContext();
+
+    // Create multiple oscillators for a harsher sound
+    for (let i = 0; i < 3; i++) {
+      setTimeout(() => {
+        const oscillator = this.audioContext.createOscillator();
+        const gainNode = this.audioContext.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(this.audioContext.destination);
+
+        oscillator.type = 'sawtooth';
+        oscillator.frequency.value = 80 + (i * 20);
+
+        gainNode.gain.value = 0.3;
+        gainNode.gain.exponentialRampToValueAtTime(
+          0.01,
+          this.audioContext.currentTime + 0.3
+        );
+
+        oscillator.start(this.audioContext.currentTime);
+        oscillator.stop(this.audioContext.currentTime + 0.3);
+      }, i * 50);
+    }
+  }
+
+  /**
+   * Play game over sound - descending tones
+   */
+  playGameOver() {
+    if (!this.enabled || !this.audioContext) return;
+
+    this.resumeContext();
+    this.stopAlienMovement();
+
+    const frequencies = [300, 250, 200, 150];
+    frequencies.forEach((freq, index) => {
+      setTimeout(() => {
+        this.playTone(freq, 0.3, 'square', 0.3);
+      }, index * 300);
+    });
+  }
+
+  /**
+   * Play victory sound - ascending tones
+   */
+  playVictory() {
+    if (!this.enabled || !this.audioContext) return;
+
+    this.resumeContext();
+    this.stopAlienMovement();
+
+    const frequencies = [200, 250, 300, 400, 500];
+    frequencies.forEach((freq, index) => {
+      setTimeout(() => {
+        this.playTone(freq, 0.2, 'sine', 0.25);
+      }, index * 150);
+    });
+  }
+
+  /**
+   * Clean up resources
+   */
+  cleanup() {
+    this.stopAlienMovement();
+    if (this.audioContext) {
+      this.audioContext.close();
+    }
+  }
+}
+
 // Game state constants
 const GameStates = {
   START: 'START',
@@ -318,6 +571,7 @@ let alienGrid;
 let bulletManager;
 let hud;
 let inputHandler;
+let soundManager;
 
 // Timing variables for deltaTime calculation
 let lastTime = 0;
@@ -337,6 +591,7 @@ function init() {
     bulletManager = new BulletManager();
     hud = new HUD();
     inputHandler = new InputHandler();
+    soundManager = new SoundManager();
 
     // Initialize input handler
     inputHandler.init();
@@ -344,6 +599,17 @@ function init() {
     // Set up game state event listeners
     gameState.on('stateChange', (data) => {
         console.log('Game state changed:', data);
+
+        // Play sounds based on state changes
+        if (data.to === GameStates.GAME_OVER) {
+            soundManager.playGameOver();
+        } else if (data.to === GameStates.WIN) {
+            soundManager.playVictory();
+        } else if (data.to === GameStates.PLAYING) {
+            soundManager.startAlienMovement(0);
+        } else if (data.from === GameStates.PLAYING) {
+            soundManager.stopAlienMovement();
+        }
     });
 
     // Start the game loop
@@ -405,6 +671,7 @@ function update(deltaTime) {
             const bulletY = playerBounds.y;
             bulletManager.add(bulletX, bulletY);
             shootCooldown = SHOOT_COOLDOWN_TIME;
+            soundManager.playShoot();
         }
 
         // Update game objects
@@ -426,6 +693,13 @@ function update(deltaTime) {
         const collision = checkBulletAlienCollisions();
         if (collision.hit) {
             gameState.addScore(collision.points);
+            soundManager.playAlienDestroyed();
+
+            // Update alien movement speed based on remaining aliens
+            const remainingAliens = alienGrid.getRemainingCount();
+            const totalAliens = 55; // 11 columns * 5 rows
+            const speedFactor = 1 - (remainingAliens / totalAliens);
+            soundManager.updateAlienMovementSpeed(speedFactor);
         }
 
         // Check if all aliens are destroyed (win condition)
@@ -437,6 +711,7 @@ function update(deltaTime) {
         const gridBounds = alienGrid.getGridBounds();
         const playerBounds = player.getBounds();
         if (gridBounds.bottom >= playerBounds.y) {
+            soundManager.playPlayerHit();
             gameState.endGame();
         }
     } else if (currentState === GameStates.GAME_OVER || currentState === GameStates.WIN) {
@@ -485,6 +760,9 @@ function resetGame() {
     alienGrid.reset();
     bulletManager.bullets = [];
     shootCooldown = 0;
+
+    // Stop alien movement sounds
+    soundManager.stopAlienMovement();
 
     // Reset game state
     gameState.reset();
