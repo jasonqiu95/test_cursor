@@ -148,6 +148,9 @@ export class AlienGrid {
     this.animationTime = 0;
     this.animationFrame = 0;
     this.animationInterval = 500; // milliseconds between animation frames
+    this.shootTimer = 0;
+    this.shootCooldown = 1000; // milliseconds between shots
+    this.shootChance = 0.3; // 30% chance to shoot
 
     this.initializeGrid();
   }
@@ -321,6 +324,7 @@ export class AlienGrid {
     this.direction = 1;
     this.animationTime = 0;
     this.animationFrame = 0;
+    this.shootTimer = 0;
     this.initializeGrid();
   }
 
@@ -337,5 +341,63 @@ export class AlienGrid {
       }
     }
     return count;
+  }
+
+  /**
+   * Get the bottom-most living alien in each column
+   */
+  getBottomAliens() {
+    const bottomAliens = [];
+
+    for (let col = 0; col < this.columns; col++) {
+      // Start from bottom row and work up
+      for (let row = this.rows - 1; row >= 0; row--) {
+        const alien = this.aliens[row][col];
+        if (alien.alive) {
+          bottomAliens.push(alien);
+          break; // Found bottom alien in this column
+        }
+      }
+    }
+
+    return bottomAliens;
+  }
+
+  /**
+   * Attempt to shoot from a random bottom alien
+   * Returns the position for bullet creation or null
+   */
+  shoot(deltaTime) {
+    this.shootTimer += deltaTime;
+
+    // Check if cooldown has passed
+    if (this.shootTimer < this.shootCooldown) {
+      return null;
+    }
+
+    // Check shoot chance
+    if (Math.random() > this.shootChance) {
+      this.shootTimer = 0; // Reset timer even if not shooting
+      return null;
+    }
+
+    // Get bottom aliens that can shoot
+    const bottomAliens = this.getBottomAliens();
+
+    if (bottomAliens.length === 0) {
+      return null;
+    }
+
+    // Randomly select one bottom alien to shoot
+    const shootingAlien = bottomAliens[Math.floor(Math.random() * bottomAliens.length)];
+
+    // Reset timer
+    this.shootTimer = 0;
+
+    // Return the position for bullet creation
+    return {
+      x: shootingAlien.x + shootingAlien.width / 2,
+      y: shootingAlien.y + shootingAlien.height
+    };
   }
 }
