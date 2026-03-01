@@ -150,4 +150,36 @@ export class HUD {
 
         ctx.restore();
     }
+
+    /**
+     * Draw pause overlay with semi-transparent background
+     * @param {CanvasRenderingContext2D} ctx - The canvas context
+     * @param {number} canvasWidth - Width of the canvas
+     * @param {number} canvasHeight - Height of the canvas
+     */
+    drawPauseOverlay(ctx, canvasWidth, canvasHeight) {
+        ctx.save();
+
+        // Draw semi-transparent overlay
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+        // Draw pause text
+        ctx.fillStyle = this.color;
+        ctx.shadowColor = this.color;
+        ctx.shadowBlur = this.glowBlur;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        const centerX = canvasWidth / 2;
+        const centerY = canvasHeight / 2;
+
+        ctx.font = this.stateFont;
+        ctx.fillText('PAUSED', centerX, centerY - 40);
+
+        ctx.font = this.hudFont;
+        ctx.fillText('PRESS P OR ESC TO RESUME', centerX, centerY + 40);
+
+        ctx.restore();
+    }
 }

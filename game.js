@@ -948,6 +948,9 @@ function resizeCanvas() {
     console.log(`Canvas resized: ${newWidth}x${newHeight} (scale: ${scale.toFixed(2)})`);
 }
 
+// Pause state
+let isPaused = false;
+
 /**
  * Initialize all game objects
  */
@@ -1035,6 +1038,26 @@ function gameLoop(currentTime) {
  */
 function update(deltaTime) {
     const currentState = gameState.getState();
+
+    // Handle pause toggle during gameplay
+    if (currentState === GameStates.PLAYING) {
+        if (inputHandler.isPauseToggled()) {
+            isPaused = !isPaused;
+            if (isPaused) {
+                soundManager.stopAlienMovement();
+            } else {
+                const remainingAliens = alienGrid.getRemainingCount();
+                const totalAliens = 55;
+                const speedFactor = 1 - (remainingAliens / totalAliens);
+                soundManager.startAlienMovement(speedFactor);
+            }
+        }
+    }
+
+    // Skip updates if paused
+    if (isPaused) {
+        return;
+    }
 
     // Handle input based on game state
     if (currentState === GameStates.START) {
@@ -1263,6 +1286,9 @@ function resetGame() {
     mysteryShipTimer = 0;
     nextMysteryShipSpawn = MYSTERY_SHIP_SPAWN_MIN + Math.random() * (MYSTERY_SHIP_SPAWN_MAX - MYSTERY_SHIP_SPAWN_MIN);
 
+    // Reset pause state
+    isPaused = false;
+
     // Stop alien movement sounds
     soundManager.stopAlienMovement();
 
@@ -1295,6 +1321,11 @@ function render() {
         hud.drawScore(ctx, gameState.getScore(), 20, 30);
         hud.drawLives(ctx, gameState.getLives(), canvas.width - 120, 30);
         hud.drawCombo(ctx, gameState.getCombo(), gameState.getMultiplier(), 20, 60);
+
+        // Draw pause overlay if paused
+        if (isPaused) {
+            hud.drawPauseOverlay(ctx, canvas.width, canvas.height);
+        }
     } else if (currentState === GameStates.GAME_OVER) {
         // Draw game over screen with final score
         hud.drawGameState(ctx, canvas.width, canvas.height, 'GAME_OVER', highScore);
