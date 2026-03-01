@@ -679,6 +679,14 @@ function update(deltaTime) {
         alienGrid.update(deltaTime);
         bulletManager.updateAll();
 
+        // Aliens shoot downward bullets
+        const alienShootPositions = alienGrid.shoot(deltaTime);
+        if (alienShootPositions) {
+            for (let pos of alienShootPositions) {
+                bulletManager.add(pos.x, pos.y, 'down');
+            }
+        }
+
         // Check for bullets that are off-screen
         for (let bullet of bulletManager.bullets) {
             if (bullet.isOffScreen(canvas.height)) {
@@ -689,7 +697,7 @@ function update(deltaTime) {
         // Remove inactive bullets
         bulletManager.removeInactive();
 
-        // Check collisions between bullets and aliens
+        // Check collisions between upward bullets and aliens
         const collision = checkBulletAlienCollisions();
         if (collision.hit) {
             gameState.addScore(collision.points);
@@ -701,6 +709,9 @@ function update(deltaTime) {
             const speedFactor = 1 - (remainingAliens / totalAliens);
             soundManager.updateAlienMovementSpeed(speedFactor);
         }
+
+        // Check collisions between downward bullets and player
+        checkPlayerBulletCollisions();
 
         // Check if all aliens are destroyed (win condition)
         if (alienGrid.allDestroyed()) {
@@ -732,7 +743,7 @@ function checkBulletAlienCollisions() {
     let hit = false;
 
     for (let bullet of bulletManager.bullets) {
-        if (!bullet.active) continue;
+        if (!bullet.active || bullet.direction === 'down') continue;
 
         const result = alienGrid.checkCollision(
             bullet.x,
@@ -749,6 +760,33 @@ function checkBulletAlienCollisions() {
     }
 
     return { hit, points: totalPoints };
+}
+
+/**
+ * Check collisions between downward bullets and player
+ */
+function checkPlayerBulletCollisions() {
+    const playerBounds = player.getBounds();
+
+    for (let bullet of bulletManager.bullets) {
+        if (!bullet.active || bullet.direction !== 'down') continue;
+
+        // Simple AABB collision detection
+        if (bullet.x < playerBounds.x + playerBounds.width &&
+            bullet.x + bullet.width > playerBounds.x &&
+            bullet.y < playerBounds.y + playerBounds.height &&
+            bullet.y + bullet.height > playerBounds.y) {
+
+            // Deactivate the bullet
+            bullet.active = false;
+
+            // Player loses a life
+            gameState.loseLife();
+
+            // Play hit sound
+            soundManager.playPlayerHit();
+        }
+    }
 }
 
 /**
