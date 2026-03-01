@@ -1,3 +1,10 @@
+// Import ES6 modules
+import { Player } from './player.js';
+import { AlienGrid } from './alien.js';
+import { BulletManager } from './bullet.js';
+import { HUD } from './hud.js';
+import { InputHandler } from './input.js';
+
 // Game state constants
 const GameStates = {
   START: 'START',
@@ -305,16 +312,216 @@ const ctx = canvas.getContext('2d');
 // Create game state instance
 const gameState = new GameState();
 
-// Game initialization
+// Game objects
+let player;
+let alienGrid;
+let bulletManager;
+let hud;
+let inputHandler;
+
+// Timing variables for deltaTime calculation
+let lastTime = 0;
+let shootCooldown = 0;
+const SHOOT_COOLDOWN_TIME = 300; // milliseconds between shots
+
+/**
+ * Initialize all game objects
+ */
 function init() {
     console.log('Game initialized');
     console.log('Canvas dimensions:', canvas.width, 'x', canvas.height);
+
+    // Initialize game objects
+    player = new Player(canvas.width, canvas.height);
+    alienGrid = new AlienGrid(50, 50);
+    bulletManager = new BulletManager();
+    hud = new HUD();
+    inputHandler = new InputHandler();
+
+    // Initialize input handler
+    inputHandler.init();
+
+    // Set up game state event listeners
+    gameState.on('stateChange', (data) => {
+        console.log('Game state changed:', data);
+    });
+
+    // Start the game loop
+    lastTime = performance.now();
+    requestAnimationFrame(gameLoop);
 }
 
-// Start the game
+/**
+ * Main game loop - runs at 60fps using requestAnimationFrame
+ * @param {number} currentTime - Current timestamp from requestAnimationFrame
+ */
+function gameLoop(currentTime) {
+    // Calculate deltaTime in milliseconds
+    const deltaTime = currentTime - lastTime;
+    lastTime = currentTime;
+
+    // Update game state
+    update(deltaTime);
+
+    // Render game
+    render();
+
+    // Continue the game loop
+    requestAnimationFrame(gameLoop);
+}
+
+/**
+ * Update game logic
+ * @param {number} deltaTime - Time elapsed since last frame in milliseconds
+ */
+function update(deltaTime) {
+    const currentState = gameState.getState();
+
+    // Handle input based on game state
+    if (currentState === GameStates.START) {
+        // Check for space to start the game
+        if (inputHandler.isShootPressed()) {
+            gameState.startGame();
+        }
+    } else if (currentState === GameStates.PLAYING) {
+        // Update shoot cooldown
+        if (shootCooldown > 0) {
+            shootCooldown -= deltaTime;
+        }
+
+        // Handle player movement
+        if (inputHandler.isLeftPressed()) {
+            player.moveLeft();
+        } else if (inputHandler.isRightPressed()) {
+            player.moveRight();
+        } else {
+            player.stop();
+        }
+
+        // Handle shooting
+        if (inputHandler.isShootPressed() && shootCooldown <= 0) {
+            const playerBounds = player.getBounds();
+            const bulletX = playerBounds.x + playerBounds.width / 2 - 1.5;
+            const bulletY = playerBounds.y;
+            bulletManager.add(bulletX, bulletY);
+            shootCooldown = SHOOT_COOLDOWN_TIME;
+        }
+
+        // Update game objects
+        player.update();
+        alienGrid.update(deltaTime);
+        bulletManager.updateAll();
+
+        // Check for bullets that are off-screen
+        for (let bullet of bulletManager.bullets) {
+            if (bullet.isOffScreen(canvas.height)) {
+                bullet.active = false;
+            }
+        }
+
+        // Remove inactive bullets
+        bulletManager.removeInactive();
+
+        // Check collisions between bullets and aliens
+        const collision = checkBulletAlienCollisions();
+        if (collision.hit) {
+            gameState.addScore(collision.points);
+        }
+
+        // Check if all aliens are destroyed (win condition)
+        if (alienGrid.allDestroyed()) {
+            gameState.winGame();
+        }
+
+        // Check if aliens reached the player (lose condition)
+        const gridBounds = alienGrid.getGridBounds();
+        const playerBounds = player.getBounds();
+        if (gridBounds.bottom >= playerBounds.y) {
+            gameState.endGame();
+        }
+    } else if (currentState === GameStates.GAME_OVER || currentState === GameStates.WIN) {
+        // Check for space to restart
+        if (inputHandler.isShootPressed()) {
+            resetGame();
+            gameState.startGame();
+        }
+    }
+}
+
+/**
+ * Check collisions between bullets and aliens
+ * @returns {object} Collision result with hit flag and points
+ */
+function checkBulletAlienCollisions() {
+    let totalPoints = 0;
+    let hit = false;
+
+    for (let bullet of bulletManager.bullets) {
+        if (!bullet.active) continue;
+
+        const result = alienGrid.checkCollision(
+            bullet.x,
+            bullet.y,
+            bullet.width,
+            bullet.height
+        );
+
+        if (result.hit) {
+            bullet.active = false;
+            totalPoints += result.points;
+            hit = true;
+        }
+    }
+
+    return { hit, points: totalPoints };
+}
+
+/**
+ * Reset the game to initial state
+ */
+function resetGame() {
+    // Reset game objects
+    player = new Player(canvas.width, canvas.height);
+    alienGrid.reset();
+    bulletManager.bullets = [];
+    shootCooldown = 0;
+
+    // Reset game state
+    gameState.reset();
+}
+
+/**
+ * Render the game
+ */
+function render() {
+    // Clear canvas with black background
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const currentState = gameState.getState();
+
+    if (currentState === GameStates.START) {
+        // Draw start screen
+        hud.drawGameState(ctx, canvas.width, canvas.height, 'START');
+    } else if (currentState === GameStates.PLAYING) {
+        // Draw game objects
+        player.draw(ctx);
+        alienGrid.draw(ctx);
+        bulletManager.drawAll(ctx);
+
+        // Draw HUD
+        hud.drawScore(ctx, gameState.getScore(), 20, 30);
+        hud.drawLives(ctx, gameState.getLives(), canvas.width - 120, 30);
+    } else if (currentState === GameStates.GAME_OVER) {
+        // Draw game over screen with final score
+        hud.drawGameState(ctx, canvas.width, canvas.height, 'GAME_OVER');
+        hud.drawScore(ctx, gameState.getScore(), canvas.width / 2 - 50, canvas.height / 2 - 80);
+    } else if (currentState === GameStates.WIN) {
+        // Draw win screen with final score
+        hud.drawGameState(ctx, canvas.width, canvas.height, 'WIN');
+        hud.drawScore(ctx, gameState.getScore(), canvas.width / 2 - 50, canvas.height / 2 - 80);
+    }
+}
+
+// Start the game when page loads
 init();
-
-// Export for use in other modules
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { GameState, GameStates };
-}
