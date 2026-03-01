@@ -833,6 +833,42 @@ const MYSTERY_SHIP_SPAWN_MIN = 10000; // Minimum 10 seconds
 const MYSTERY_SHIP_SPAWN_MAX = 20000; // Maximum 20 seconds
 let nextMysteryShipSpawn = MYSTERY_SHIP_SPAWN_MIN + Math.random() * (MYSTERY_SHIP_SPAWN_MAX - MYSTERY_SHIP_SPAWN_MIN);
 
+// High score persistence
+let highScore = 0;
+const HIGH_SCORE_KEY = 'spaceInvadersHighScore';
+
+/**
+ * Load high score from localStorage
+ */
+function loadHighScore() {
+    try {
+        const savedHighScore = localStorage.getItem(HIGH_SCORE_KEY);
+        if (savedHighScore !== null) {
+            highScore = parseInt(savedHighScore, 10);
+            if (isNaN(highScore) || highScore < 0) {
+                highScore = 0;
+            }
+        }
+    } catch (e) {
+        console.warn('Failed to load high score from localStorage:', e);
+        highScore = 0;
+    }
+}
+
+/**
+ * Save high score to localStorage
+ */
+function saveHighScore(score) {
+    try {
+        if (score > highScore) {
+            highScore = score;
+            localStorage.setItem(HIGH_SCORE_KEY, highScore.toString());
+        }
+    } catch (e) {
+        console.warn('Failed to save high score to localStorage:', e);
+    }
+}
+
 /**
  * Resize canvas to fit the window while maintaining aspect ratio
  */
@@ -880,6 +916,9 @@ function init() {
         }, 100);
     });
 
+    // Load high score from localStorage
+    loadHighScore();
+
     // Initialize game objects
     player = new Player(canvas.width, canvas.height);
     alienGrid = new AlienGrid(50, 50);
@@ -900,8 +939,10 @@ function init() {
         // Play sounds based on state changes
         if (data.to === GameStates.GAME_OVER) {
             soundManager.playGameOver();
+            saveHighScore(data.score);
         } else if (data.to === GameStates.WIN) {
             soundManager.playVictory();
+            saveHighScore(data.score);
         } else if (data.to === GameStates.PLAYING) {
             soundManager.startAlienMovement(0);
         } else if (data.from === GameStates.PLAYING) {
@@ -1176,7 +1217,7 @@ function render() {
 
     if (currentState === GameStates.START) {
         // Draw start screen
-        hud.drawGameState(ctx, canvas.width, canvas.height, 'START');
+        hud.drawGameState(ctx, canvas.width, canvas.height, 'START', highScore);
     } else if (currentState === GameStates.PLAYING) {
         // Draw game objects
         player.draw(ctx);
@@ -1190,11 +1231,11 @@ function render() {
         hud.drawLives(ctx, gameState.getLives(), canvas.width - 120, 30);
     } else if (currentState === GameStates.GAME_OVER) {
         // Draw game over screen with final score
-        hud.drawGameState(ctx, canvas.width, canvas.height, 'GAME_OVER');
+        hud.drawGameState(ctx, canvas.width, canvas.height, 'GAME_OVER', highScore);
         hud.drawScore(ctx, gameState.getScore(), canvas.width / 2 - 50, canvas.height / 2 - 80);
     } else if (currentState === GameStates.WIN) {
         // Draw win screen with final score
-        hud.drawGameState(ctx, canvas.width, canvas.height, 'WIN');
+        hud.drawGameState(ctx, canvas.width, canvas.height, 'WIN', highScore);
         hud.drawScore(ctx, gameState.getScore(), canvas.width / 2 - 50, canvas.height / 2 - 80);
     }
 }
