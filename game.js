@@ -4,6 +4,7 @@ import { AlienGrid } from './alien.js';
 import { BulletManager } from './bullet.js';
 import { HUD } from './hud.js';
 import { InputHandler } from './input.js';
+import { ShieldManager } from './shield.js';
 
 /**
  * Sound Manager class for retro arcade sound effects using Web Audio API
@@ -572,6 +573,7 @@ let bulletManager;
 let hud;
 let inputHandler;
 let soundManager;
+let shieldManager;
 
 // Timing variables for deltaTime calculation
 let lastTime = 0;
@@ -592,6 +594,7 @@ function init() {
     hud = new HUD();
     inputHandler = new InputHandler();
     soundManager = new SoundManager();
+    shieldManager = new ShieldManager(canvas.width, canvas.height);
 
     // Initialize input handler
     inputHandler.init();
@@ -745,6 +748,13 @@ function checkBulletAlienCollisions() {
     for (let bullet of bulletManager.bullets) {
         if (!bullet.active || bullet.direction === 'down') continue;
 
+        // Check shield collision first
+        if (shieldManager.checkCollision(bullet.x, bullet.y, bullet.width, bullet.height)) {
+            bullet.active = false;
+            continue;
+        }
+
+        // Check alien collision
         const result = alienGrid.checkCollision(
             bullet.x,
             bullet.y,
@@ -771,7 +781,13 @@ function checkPlayerBulletCollisions() {
     for (let bullet of bulletManager.bullets) {
         if (!bullet.active || bullet.direction !== 'down') continue;
 
-        // Simple AABB collision detection
+        // Check shield collision first
+        if (shieldManager.checkCollision(bullet.x, bullet.y, bullet.width, bullet.height)) {
+            bullet.active = false;
+            continue;
+        }
+
+        // Simple AABB collision detection with player
         if (bullet.x < playerBounds.x + playerBounds.width &&
             bullet.x + bullet.width > playerBounds.x &&
             bullet.y < playerBounds.y + playerBounds.height &&
@@ -797,6 +813,7 @@ function resetGame() {
     player = new Player(canvas.width, canvas.height);
     alienGrid.reset();
     bulletManager.bullets = [];
+    shieldManager.reset();
     shootCooldown = 0;
 
     // Stop alien movement sounds
@@ -824,6 +841,7 @@ function render() {
         player.draw(ctx);
         alienGrid.draw(ctx);
         bulletManager.drawAll(ctx);
+        shieldManager.draw(ctx);
 
         // Draw HUD
         hud.drawScore(ctx, gameState.getScore(), 20, 30);
