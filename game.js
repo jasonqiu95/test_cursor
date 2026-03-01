@@ -415,6 +415,91 @@ class MysteryShip {
   }
 }
 
+/**
+ * Particle class for visual effects
+ */
+class Particle {
+  constructor(x, y, color = '#ff0000') {
+    this.x = x;
+    this.y = y;
+    this.vx = (Math.random() - 0.5) * 4;
+    this.vy = (Math.random() - 0.5) * 4;
+    this.life = 1.0; // 1.0 = fully alive, 0.0 = dead
+    this.decay = 0.01 + Math.random() * 0.02; // Random decay rate
+    this.size = 2 + Math.random() * 3;
+    this.color = color;
+  }
+
+  update() {
+    this.x += this.vx;
+    this.y += this.vy;
+    this.vy += 0.1; // Gravity effect
+    this.life -= this.decay;
+  }
+
+  draw(ctx) {
+    ctx.save();
+    ctx.globalAlpha = this.life;
+    ctx.fillStyle = this.color;
+    ctx.fillRect(this.x, this.y, this.size, this.size);
+    ctx.restore();
+  }
+
+  isDead() {
+    return this.life <= 0;
+  }
+}
+
+/**
+ * ParticleManager class for managing particle effects
+ */
+class ParticleManager {
+  constructor() {
+    this.particles = [];
+  }
+
+  /**
+   * Create explosion effect at a position
+   * @param {number} x - X position
+   * @param {number} y - Y position
+   * @param {string} color - Particle color
+   * @param {number} count - Number of particles
+   */
+  createExplosion(x, y, color = '#ff0000', count = 15) {
+    for (let i = 0; i < count; i++) {
+      this.particles.push(new Particle(x, y, color));
+    }
+  }
+
+  /**
+   * Update all particles
+   */
+  update() {
+    for (let particle of this.particles) {
+      particle.update();
+    }
+
+    // Remove dead particles
+    this.particles = this.particles.filter(p => !p.isDead());
+  }
+
+  /**
+   * Draw all particles
+   */
+  draw(ctx) {
+    for (let particle of this.particles) {
+      particle.draw(ctx);
+    }
+  }
+
+  /**
+   * Clear all particles
+   */
+  clear() {
+    this.particles = [];
+  }
+}
+
 // Game state constants
 const GameStates = {
   START: 'START',
@@ -730,6 +815,7 @@ let hud;
 let inputHandler;
 let soundManager;
 let mysteryShip;
+let particleManager;
 
 // Timing variables for deltaTime calculation
 let lastTime = 0;
@@ -757,6 +843,7 @@ function init() {
     inputHandler = new InputHandler();
     soundManager = new SoundManager();
     mysteryShip = new MysteryShip(canvas.width);
+    particleManager = new ParticleManager();
 
     // Initialize input handler
     inputHandler.init();
@@ -843,6 +930,7 @@ function update(deltaTime) {
         player.update();
         alienGrid.update(deltaTime);
         bulletManager.updateAll();
+        particleManager.update();
 
         // Update mystery ship timer and spawn
         mysteryShipTimer += deltaTime;
@@ -940,6 +1028,14 @@ function checkBulletAlienCollisions() {
             bullet.active = false;
             totalPoints += result.points;
             hit = true;
+
+            // Create particle explosion at alien hit position
+            particleManager.createExplosion(
+                bullet.x + bullet.width / 2,
+                bullet.y + bullet.height / 2,
+                '#00ff00', // Green particles for alien explosions
+                20
+            );
         }
     }
 
@@ -988,6 +1084,14 @@ function checkPlayerBulletCollisions() {
 
             // Play hit sound
             soundManager.playPlayerHit();
+
+            // Create particle explosion at player hit position
+            particleManager.createExplosion(
+                playerBounds.x + playerBounds.width / 2,
+                playerBounds.y + playerBounds.height / 2,
+                '#ff0000', // Red particles for player hit
+                25
+            );
         }
     }
 }
@@ -1000,6 +1104,7 @@ function resetGame() {
     player = new Player(canvas.width, canvas.height);
     alienGrid.reset();
     bulletManager.bullets = [];
+    particleManager.clear();
     shootCooldown = 0;
 
     // Reset mystery ship
@@ -1033,6 +1138,7 @@ function render() {
         alienGrid.draw(ctx);
         mysteryShip.draw(ctx);
         bulletManager.drawAll(ctx);
+        particleManager.draw(ctx);
 
         // Draw HUD
         hud.drawScore(ctx, gameState.getScore(), 20, 30);
