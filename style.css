@@ -78,7 +78,7 @@ main {
   position: relative;
   z-index: 10;
   text-align: center;
-  padding: 30px;
+  padding: 20px;
   background-color: rgba(0, 20, 0, 0.8);
   border: 2px solid #00ff00;
   border-radius: 10px;
@@ -86,6 +86,11 @@ main {
     0 0 20px rgba(0, 255, 0, 0.3),
     0 0 40px rgba(0, 255, 0, 0.2),
     inset 0 0 30px rgba(0, 255, 0, 0.05);
+  max-width: 95vw;
+  max-height: 95vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 /* Canvas styling */
@@ -100,6 +105,12 @@ canvas {
     inset 0 0 20px rgba(0, 255, 0, 0.1);
   image-rendering: pixelated;
   image-rendering: crisp-edges;
+  /* Responsive sizing - maintain aspect ratio */
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
 }
 
 /* Text elements */
