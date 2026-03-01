@@ -248,6 +248,46 @@ class SoundManager {
   }
 
   /**
+   * Play mystery ship sound - high-pitched continuous tone
+   */
+  playMysteryShip() {
+    if (!this.enabled || !this.audioContext) return;
+
+    this.resumeContext();
+
+    const oscillator = this.audioContext.createOscillator();
+    const gainNode = this.audioContext.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(this.audioContext.destination);
+
+    oscillator.type = 'sine';
+    oscillator.frequency.value = 450;
+
+    gainNode.gain.value = 0.15;
+
+    oscillator.start(this.audioContext.currentTime);
+    oscillator.stop(this.audioContext.currentTime + 0.5);
+  }
+
+  /**
+   * Play mystery ship destroyed sound - high-value bonus
+   */
+  playMysteryShipDestroyed() {
+    if (!this.enabled || !this.audioContext) return;
+
+    this.resumeContext();
+
+    // Play a sequence of ascending tones for bonus effect
+    const frequencies = [300, 400, 500, 600];
+    frequencies.forEach((freq, index) => {
+      setTimeout(() => {
+        this.playTone(freq, 0.1, 'sine', 0.3);
+      }, index * 50);
+    });
+  }
+
+  /**
    * Clean up resources
    */
   cleanup() {
@@ -255,6 +295,123 @@ class SoundManager {
     if (this.audioContext) {
       this.audioContext.close();
     }
+  }
+}
+
+/**
+ * Mystery Ship - bonus ship that periodically flies across the top of the screen
+ */
+class MysteryShip {
+  constructor(canvasWidth) {
+    this.canvasWidth = canvasWidth;
+    this.width = 30;
+    this.height = 15;
+    this.speed = 2;
+    this.active = false;
+    this.x = 0;
+    this.y = 40;
+    this.direction = 1; // 1 for right, -1 for left
+    this.bonusPoints = [50, 100, 150, 200, 250, 300]; // Random bonus values
+  }
+
+  /**
+   * Spawn the mystery ship
+   */
+  spawn() {
+    // Random direction (left to right or right to left)
+    this.direction = Math.random() < 0.5 ? 1 : -1;
+
+    if (this.direction === 1) {
+      // Start from left
+      this.x = -this.width;
+    } else {
+      // Start from right
+      this.x = this.canvasWidth;
+    }
+
+    this.active = true;
+  }
+
+  /**
+   * Update mystery ship position
+   */
+  update() {
+    if (!this.active) return;
+
+    this.x += this.speed * this.direction;
+
+    // Deactivate if off-screen
+    if (this.direction === 1 && this.x > this.canvasWidth) {
+      this.active = false;
+    } else if (this.direction === -1 && this.x < -this.width) {
+      this.active = false;
+    }
+  }
+
+  /**
+   * Draw the mystery ship
+   */
+  draw(ctx) {
+    if (!this.active) return;
+
+    ctx.fillStyle = '#FF0000';
+
+    // Draw UFO-like shape
+    // Top dome
+    ctx.beginPath();
+    ctx.ellipse(this.x + this.width / 2, this.y + 5, this.width / 3, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Bottom disc
+    ctx.fillRect(this.x, this.y + 8, this.width, 7);
+
+    // Add small lights
+    ctx.fillStyle = '#FFFF00';
+    for (let i = 0; i < 3; i++) {
+      ctx.fillRect(this.x + 5 + i * 10, this.y + 10, 3, 3);
+    }
+  }
+
+  /**
+   * Check collision with a bullet
+   */
+  checkCollision(bulletX, bulletY, bulletWidth, bulletHeight) {
+    if (!this.active) return false;
+
+    return (
+      bulletX < this.x + this.width &&
+      bulletX + bulletWidth > this.x &&
+      bulletY < this.y + this.height &&
+      bulletY + bulletHeight > this.y
+    );
+  }
+
+  /**
+   * Destroy the mystery ship and return bonus points
+   */
+  destroy() {
+    this.active = false;
+    // Return random bonus points
+    return this.bonusPoints[Math.floor(Math.random() * this.bonusPoints.length)];
+  }
+
+  /**
+   * Get bounds for collision detection
+   */
+  getBounds() {
+    return {
+      x: this.x,
+      y: this.y,
+      width: this.width,
+      height: this.height
+    };
+  }
+
+  /**
+   * Check if mystery ship is active
+   */
+  isActive() {
+    return this.active;
   }
 }
 
@@ -572,11 +729,18 @@ let bulletManager;
 let hud;
 let inputHandler;
 let soundManager;
+let mysteryShip;
 
 // Timing variables for deltaTime calculation
 let lastTime = 0;
 let shootCooldown = 0;
 const SHOOT_COOLDOWN_TIME = 300; // milliseconds between shots
+
+// Mystery ship spawn timing
+let mysteryShipTimer = 0;
+const MYSTERY_SHIP_SPAWN_MIN = 10000; // Minimum 10 seconds
+const MYSTERY_SHIP_SPAWN_MAX = 20000; // Maximum 20 seconds
+let nextMysteryShipSpawn = MYSTERY_SHIP_SPAWN_MIN + Math.random() * (MYSTERY_SHIP_SPAWN_MAX - MYSTERY_SHIP_SPAWN_MIN);
 
 /**
  * Initialize all game objects
@@ -592,6 +756,7 @@ function init() {
     hud = new HUD();
     inputHandler = new InputHandler();
     soundManager = new SoundManager();
+    mysteryShip = new MysteryShip(canvas.width);
 
     // Initialize input handler
     inputHandler.init();
@@ -679,6 +844,18 @@ function update(deltaTime) {
         alienGrid.update(deltaTime);
         bulletManager.updateAll();
 
+        // Update mystery ship timer and spawn
+        mysteryShipTimer += deltaTime;
+        if (mysteryShipTimer >= nextMysteryShipSpawn && !mysteryShip.isActive()) {
+            mysteryShip.spawn();
+            mysteryShipTimer = 0;
+            nextMysteryShipSpawn = MYSTERY_SHIP_SPAWN_MIN + Math.random() * (MYSTERY_SHIP_SPAWN_MAX - MYSTERY_SHIP_SPAWN_MIN);
+            soundManager.playMysteryShip();
+        }
+
+        // Update mystery ship
+        mysteryShip.update();
+
         // Aliens shoot downward bullets
         const alienShootPositions = alienGrid.shoot(deltaTime);
         if (alienShootPositions) {
@@ -708,6 +885,13 @@ function update(deltaTime) {
             const totalAliens = 55; // 11 columns * 5 rows
             const speedFactor = 1 - (remainingAliens / totalAliens);
             soundManager.updateAlienMovementSpeed(speedFactor);
+        }
+
+        // Check collisions between bullets and mystery ship
+        const mysteryShipHit = checkMysteryShipCollisions();
+        if (mysteryShipHit) {
+            gameState.addScore(mysteryShipHit);
+            soundManager.playMysteryShipDestroyed();
         }
 
         // Check collisions between downward bullets and player
@@ -763,6 +947,25 @@ function checkBulletAlienCollisions() {
 }
 
 /**
+ * Check collisions between bullets and mystery ship
+ * @returns {number} Bonus points awarded (0 if no hit)
+ */
+function checkMysteryShipCollisions() {
+    if (!mysteryShip.isActive()) return 0;
+
+    for (let bullet of bulletManager.bullets) {
+        if (!bullet.active || bullet.direction === 'down') continue;
+
+        if (mysteryShip.checkCollision(bullet.x, bullet.y, bullet.width, bullet.height)) {
+            bullet.active = false;
+            return mysteryShip.destroy();
+        }
+    }
+
+    return 0;
+}
+
+/**
  * Check collisions between downward bullets and player
  */
 function checkPlayerBulletCollisions() {
@@ -799,6 +1002,11 @@ function resetGame() {
     bulletManager.bullets = [];
     shootCooldown = 0;
 
+    // Reset mystery ship
+    mysteryShip = new MysteryShip(canvas.width);
+    mysteryShipTimer = 0;
+    nextMysteryShipSpawn = MYSTERY_SHIP_SPAWN_MIN + Math.random() * (MYSTERY_SHIP_SPAWN_MAX - MYSTERY_SHIP_SPAWN_MIN);
+
     // Stop alien movement sounds
     soundManager.stopAlienMovement();
 
@@ -823,6 +1031,7 @@ function render() {
         // Draw game objects
         player.draw(ctx);
         alienGrid.draw(ctx);
+        mysteryShip.draw(ctx);
         bulletManager.drawAll(ctx);
 
         // Draw HUD
