@@ -10,8 +10,13 @@ export class InputHandler {
       ArrowRight: false,
       Space: false,
       A: false,
-      D: false
+      D: false,
+      KeyP: false,
+      Escape: false
     };
+
+    // Track pause toggle to prevent repeated triggers
+    this.pauseToggled = false;
 
     // Bind event handlers to maintain correct 'this' context
     this.handleKeyDown = this.handleKeyDown.bind(this);
@@ -31,7 +36,7 @@ export class InputHandler {
    * @param {KeyboardEvent} event - The keyboard event
    */
   handleKeyDown(event) {
-    const key = event.code === 'Space' ? 'Space' : event.key;
+    const key = event.code === 'Space' ? 'Space' : event.code;
 
     // Only process keys we're tracking
     if (key in this.keys) {
@@ -47,11 +52,16 @@ export class InputHandler {
    * @param {KeyboardEvent} event - The keyboard event
    */
   handleKeyUp(event) {
-    const key = event.code === 'Space' ? 'Space' : event.key;
+    const key = event.code === 'Space' ? 'Space' : event.code;
 
     // Only process keys we're tracking
     if (key in this.keys) {
       this.keys[key] = false;
+
+      // Reset pause toggle when key is released
+      if (key === 'KeyP' || key === 'Escape') {
+        this.pauseToggled = false;
+      }
 
       // Prevent default behavior for game keys to avoid page scrolling
       event.preventDefault();
@@ -89,6 +99,18 @@ export class InputHandler {
    */
   isShootPressed() {
     return this.keys.Space;
+  }
+
+  /**
+   * Check if pause keys are pressed (P or ESC) and not yet toggled
+   * @returns {boolean} True if pause should be toggled
+   */
+  isPauseToggled() {
+    if ((this.keys.KeyP || this.keys.Escape) && !this.pauseToggled) {
+      this.pauseToggled = true;
+      return true;
+    }
+    return false;
   }
 
   /**
