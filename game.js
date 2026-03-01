@@ -274,6 +274,7 @@ class GameState {
     this.state = GameStates.START;
     this.lives = 3;
     this.score = 0;
+    this.combo = 0;
     this.eventListeners = {};
 
     // Valid state transitions
@@ -304,6 +305,58 @@ class GameState {
    */
   getScore() {
     return this.score;
+  }
+
+  /**
+   * Get current combo count
+   */
+  getCombo() {
+    return this.combo;
+  }
+
+  /**
+   * Get current multiplier based on combo
+   * Every 5 consecutive hits increases multiplier by 1x
+   */
+  getMultiplier() {
+    return 1 + Math.floor(this.combo / 5);
+  }
+
+  /**
+   * Increase combo count
+   */
+  increaseCombo() {
+    const previousCombo = this.combo;
+    this.combo++;
+
+    const previousMultiplier = 1 + Math.floor(previousCombo / 5);
+    const currentMultiplier = this.getMultiplier();
+
+    this.emit('comboChange', {
+      previous: previousCombo,
+      current: this.combo,
+      multiplier: currentMultiplier,
+      multiplierIncreased: currentMultiplier > previousMultiplier
+    });
+
+    return this.combo;
+  }
+
+  /**
+   * Reset combo count
+   */
+  resetCombo() {
+    if (this.combo === 0) return;
+
+    const previousCombo = this.combo;
+    this.combo = 0;
+
+    this.emit('comboChange', {
+      previous: previousCombo,
+      current: this.combo,
+      multiplier: 1,
+      multiplierIncreased: false
+    });
   }
 
   /**
@@ -376,11 +429,13 @@ class GameState {
     this.state = GameStates.START;
     this.lives = 3;
     this.score = 0;
+    this.combo = 0;
 
     this.emit('reset', {
       previousState,
       lives: this.lives,
-      score: this.score
+      score: this.score,
+      combo: this.combo
     });
   }
 
@@ -690,6 +745,10 @@ function update(deltaTime) {
         // Check for bullets that are off-screen
         for (let bullet of bulletManager.bullets) {
             if (bullet.isOffScreen(canvas.height)) {
+                // Reset combo if a player bullet (upward) misses
+                if (bullet.active && bullet.direction !== 'down') {
+                    gameState.resetCombo();
+                }
                 bullet.active = false;
             }
         }
@@ -700,7 +759,13 @@ function update(deltaTime) {
         // Check collisions between upward bullets and aliens
         const collision = checkBulletAlienCollisions();
         if (collision.hit) {
-            gameState.addScore(collision.points);
+            // Increase combo on hit
+            gameState.increaseCombo();
+
+            // Apply multiplier to score
+            const multiplier = gameState.getMultiplier();
+            const pointsWithMultiplier = collision.points * multiplier;
+            gameState.addScore(pointsWithMultiplier);
             soundManager.playAlienDestroyed();
 
             // Update alien movement speed based on remaining aliens
@@ -828,6 +893,7 @@ function render() {
         // Draw HUD
         hud.drawScore(ctx, gameState.getScore(), 20, 30);
         hud.drawLives(ctx, gameState.getLives(), canvas.width - 120, 30);
+        hud.drawCombo(ctx, gameState.getCombo(), gameState.getMultiplier(), 20, 60);
     } else if (currentState === GameStates.GAME_OVER) {
         // Draw game over screen with final score
         hud.drawGameState(ctx, canvas.width, canvas.height, 'GAME_OVER');
