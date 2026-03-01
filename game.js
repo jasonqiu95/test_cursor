@@ -562,6 +562,11 @@ class GameState {
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
+// Base canvas dimensions for game logic
+const BASE_WIDTH = 800;
+const BASE_HEIGHT = 600;
+const ASPECT_RATIO = BASE_WIDTH / BASE_HEIGHT;
+
 // Create game state instance
 const gameState = new GameState();
 
@@ -579,11 +584,51 @@ let shootCooldown = 0;
 const SHOOT_COOLDOWN_TIME = 300; // milliseconds between shots
 
 /**
+ * Resize canvas to fit the window while maintaining aspect ratio
+ */
+function resizeCanvas() {
+    const container = canvas.parentElement;
+    const containerWidth = container.clientWidth - 40; // Account for padding
+    const containerHeight = window.innerHeight - 100; // Leave space for container padding
+
+    // Calculate the scale to fit within the container while maintaining aspect ratio
+    const scaleX = containerWidth / BASE_WIDTH;
+    const scaleY = containerHeight / BASE_HEIGHT;
+    const scale = Math.min(scaleX, scaleY, 1.5); // Cap at 1.5x to prevent excessive scaling
+
+    // Calculate new dimensions
+    const newWidth = BASE_WIDTH * scale;
+    const newHeight = BASE_HEIGHT * scale;
+
+    // Apply CSS size (visual size)
+    canvas.style.width = `${newWidth}px`;
+    canvas.style.height = `${newHeight}px`;
+
+    console.log(`Canvas resized: ${newWidth}x${newHeight} (scale: ${scale.toFixed(2)})`);
+}
+
+/**
  * Initialize all game objects
  */
 function init() {
     console.log('Game initialized');
     console.log('Canvas dimensions:', canvas.width, 'x', canvas.height);
+
+    // Set canvas internal resolution
+    canvas.width = BASE_WIDTH;
+    canvas.height = BASE_HEIGHT;
+
+    // Initialize responsive canvas sizing
+    resizeCanvas();
+
+    // Add resize event listener with debouncing
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(() => {
+            resizeCanvas();
+        }, 100);
+    });
 
     // Initialize game objects
     player = new Player(canvas.width, canvas.height);
