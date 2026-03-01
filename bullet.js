@@ -2,10 +2,11 @@
  * Bullet class - represents a single projectile
  */
 export class Bullet {
-    constructor(x, y) {
+    constructor(x, y, direction = 'up') {
         this.x = x;
         this.y = y;
-        this.speed = -5; // Negative for upward movement
+        this.direction = direction;
+        this.speed = direction === 'down' ? 5 : -5; // Positive for downward, negative for upward
         this.active = true;
         this.width = 3;
         this.height = 10;
@@ -19,7 +20,7 @@ export class Bullet {
     }
 
     /**
-     * Draw bullet as green rectangle with glow effect
+     * Draw bullet with color based on direction
      * @param {CanvasRenderingContext2D} ctx - Canvas rendering context
      */
     draw(ctx) {
@@ -27,12 +28,16 @@ export class Bullet {
 
         ctx.save();
 
+        // Set colors based on direction
+        const color = this.direction === 'down' ? '#FF4500' : '#00FF00'; // Red/orange for down, green for up
+        const glowColor = this.direction === 'down' ? '#FFD700' : '#00FF00'; // Yellow glow for down
+
         // Outer glow
-        ctx.shadowColor = '#00FF00';
+        ctx.shadowColor = glowColor;
         ctx.shadowBlur = 10;
 
         // Draw bullet
-        ctx.fillStyle = '#00FF00';
+        ctx.fillStyle = color;
         ctx.fillRect(this.x, this.y, this.width, this.height);
 
         // Inner highlight for more glow
@@ -48,7 +53,11 @@ export class Bullet {
      * @returns {boolean} True if bullet is off screen
      */
     isOffScreen(canvasHeight) {
-        return this.y + this.height < 0;
+        if (this.direction === 'down') {
+            return this.y > canvasHeight;
+        } else {
+            return this.y + this.height < 0;
+        }
     }
 }
 
@@ -64,9 +73,10 @@ export class BulletManager {
      * Add a new bullet at specified position
      * @param {number} x - X position
      * @param {number} y - Y position
+     * @param {string} direction - Direction of bullet ('up' or 'down')
      */
-    add(x, y) {
-        this.bullets.push(new Bullet(x, y));
+    add(x, y, direction = 'up') {
+        this.bullets.push(new Bullet(x, y, direction));
     }
 
     /**
