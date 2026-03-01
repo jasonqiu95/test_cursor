@@ -108,7 +108,48 @@ describe('Wave Tracking', () => {
     gameState = new GameState();
   });
 
-  // TODO: Add wave tracking tests
+  it('should initialize with wave 1', () => {
+    assertEqual(gameState.getWave(), 1);
+  });
+
+  it('should return current wave with getWave()', () => {
+    assertEqual(gameState.getWave(), 1);
+
+    gameState.nextWave();
+    assertEqual(gameState.getWave(), 2);
+
+    gameState.nextWave();
+    assertEqual(gameState.getWave(), 3);
+  });
+
+  it('should increment wave and return new value with nextWave()', () => {
+    assertEqual(gameState.nextWave(), 2);
+    assertEqual(gameState.nextWave(), 3);
+    assertEqual(gameState.nextWave(), 4);
+  });
+
+  it('should emit waveChange event with previous and current values', () => {
+    let eventData = null;
+
+    gameState.on('waveChange', (data) => {
+      eventData = data;
+    });
+
+    gameState.nextWave();
+
+    assertDeepEqual(eventData, {
+      previous: 1,
+      current: 2
+    });
+
+    // Test second wave change
+    gameState.nextWave();
+
+    assertDeepEqual(eventData, {
+      previous: 2,
+      current: 3
+    });
+  });
 });
 
 // ========================================
